@@ -1,94 +1,54 @@
 import streamlit as st
+import matplotlib.pyplot as plt
+
 from utils.resume_parser import extract_text_from_pdf
 from utils.skill_extractor import extract_skills
-from utils.job_predictor import predict_job_role
-from utils.ats_calculator import calculate_ats_score
+from utils.job_matcher import match_resume_job
+from utils.feedback_generator import skill_gap_analysis, generate_resume_feedback
+from utils.report_generator import generate_pdf_report
 
-# Page settings
-st.set_page_config(
-    page_title="AI Resume Analyzer",
-    page_icon="🤖",
-    layout="wide"
-)
+st.title("🚀 AI Resume Analyzer — Pro Version")
 
-# Header
-st.title("🤖 AI Resume Analyzer & Job Matcher")
-st.markdown("Upload your resume → Get job suggestions, ATS score, and skill analysis")
+uploaded_file = st.file_uploader("Upload Resume PDF", type="pdf")
 
-st.divider()
+job_desc = st.text_area("Paste Job Description")
 
-# Upload section
-uploaded_file = st.file_uploader("📄 Upload Resume (PDF)", type=["pdf"])
+required_skills = [
+    "Python", "SQL", "Machine Learning",
+    "Data Analysis", "Communication"
+]
 
-if uploaded_file:
+if uploaded_file and job_desc:
 
-    with st.spinner("Analyzing Resume..."):
-        text = extract_text_from_pdf(uploaded_file)
-        skills = extract_skills(text)
-        job_role = predict_job_role(skills)
-        ats_score = calculate_ats_score(text)
+    text = extract_text_from_pdf(uploaded_file)
+    found_skills = extract_skills(text)
 
-    st.success("Analysis Complete ✅")
+    score = match_resume_job(text, job_desc)
+    missing = skill_gap_analysis(found_skills, required_skills)
+    feedback = generate_resume_feedback(score, missing)
 
-    col1, col2 = st.columns(2)
+    st.subheader("📊 Job Match Score")
+    st.write(f"{score}%")
 
-    # Resume Preview
-    with col1:
-        st.subheader("📄 Resume Preview")
-        st.text_area("", text, height=300)
+    st.subheader("🧠 Detected Skills")
+    st.write(found_skills)
 
-    # Skills
-    with col2:
-        st.subheader("🧠 Extracted Skills")
+    st.subheader("❌ Missing Skills")
+    st.write(missing)
 
-        if skills:
-            skill_html = ""
-            for skill in skills:
-                skill_html += f"""
-                <span style="
-                background:#1f77b4;
-                padding:8px;
-                border-radius:8px;
-                margin:5px;
-                display:inline-block;
-                color:white;">
-                {skill}
-                </span>
-                """
-            st.markdown(skill_html, unsafe_allow_html=True)
-        else:
-            st.warning("No skills detected")
+    st.subheader("💡 AI Suggestions")
+    for f in feedback:
+        st.write("•", f)
 
-    st.divider()
+    # Chart
+    st.subheader("📈 Skill Score Chart")
+    fig, ax = plt.subplots()
+    ax.bar(["Match Score"], [score])
+    st.pyplot(fig)
 
-    # Results Section
-    col3, col4 = st.columns(2)
+    # PDF Download
+    if st.button("Download Report"):
+        pdf_file = generate_pdf_report(score, found_skills, feedback)
 
-    # Job Role
-    with col3:
-        st.subheader("💼 Suggested Job Role")
-        st.success(job_role)
-
-    # ATS Score
-    with col4:
-        st.subheader("📊 ATS Score")
-        st.progress(ats_score / 100)
-        st.metric("Score", f"{ats_score}/100")
-
-        if ats_score < 50:
-            st.error("Needs improvement")
-        elif ats_score < 75:
-            st.warning("Good but can improve")
-        else:
-            st.success("Excellent resume")
-
-    st.divider()
-
-    # Skill Gap Suggestions
-    st.subheader("📚 Recommended Learning")
-
-    missing_skills = ["Machine Learning", "Cloud", "System Design"]
-
-    for skill in missing_skills:
-        if skill not in skills:
-            st.write("✅ Learn:", skill)
+        with open(pdf_file, "rb") as f:
+            st.download_button("Download PDF", f, file_name=pdf_file)
