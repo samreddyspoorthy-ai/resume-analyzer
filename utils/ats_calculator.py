@@ -1,4 +1,11 @@
 def calculate_ats_score(text):
-    keywords = ["experience", "project", "skills", "education"]
-    score = sum(1 for k in keywords if k in text.lower())
-    return score * 25
+    keywords = [
+        "python", "sql", "machine learning",
+        "data analysis", "communication",
+        "project", "team", "ai"
+    ]
+
+    text = text.lower()
+    score = sum(10 for k in keywords if k in text)
+
+    return min(score, 100)
