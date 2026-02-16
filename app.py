@@ -1,54 +1,138 @@
 import streamlit as st
-import matplotlib.pyplot as plt
+import fitz  # PyMuPDF
 
-from utils.resume_parser import extract_text_from_pdf
+# Import your utils
 from utils.skill_extractor import extract_skills
 from utils.job_matcher import match_resume_job
-from utils.feedback_generator import skill_gap_analysis, generate_resume_feedback
-from utils.report_generator import generate_pdf_report
+
+# -------------------------------
+# PAGE SETTINGS
+# -------------------------------
+st.set_page_config(
+    page_title="AI Resume Analyzer Pro",
+    page_icon="🚀",
+    layout="wide"
+)
 
 st.title("🚀 AI Resume Analyzer — Pro Version")
+st.write("Upload your resume and analyze skills, ATS score, and job match.")
 
-uploaded_file = st.file_uploader("Upload Resume PDF", type="pdf")
+# -------------------------------
+# SIDEBAR
+# -------------------------------
+st.sidebar.title("⚙️ Settings")
+show_text = st.sidebar.checkbox("Show Resume Text")
 
-job_desc = st.text_area("Paste Job Description")
+# -------------------------------
+# FILE UPLOAD
+# -------------------------------
+uploaded_file = st.file_uploader("Upload Resume PDF", type=["pdf"])
 
-required_skills = [
-    "Python", "SQL", "Machine Learning",
-    "Data Analysis", "Communication"
-]
+# Job description input
+job_desc = st.text_area("Paste Job Description (Optional)")
 
-if uploaded_file and job_desc:
+# -------------------------------
+# FUNCTION → EXTRACT TEXT FROM PDF
+# -------------------------------
+def extract_text(pdf_file):
+    text = ""
+    pdf = fitz.open(stream=pdf_file.read(), filetype="pdf")
 
-    text = extract_text_from_pdf(uploaded_file)
-    found_skills = extract_skills(text)
+    for page in pdf:
+        text += page.get_text()
 
-    score = match_resume_job(text, job_desc)
-    missing = skill_gap_analysis(found_skills, required_skills)
-    feedback = generate_resume_feedback(score, missing)
+    return text
 
-    st.subheader("📊 Job Match Score")
-    st.write(f"{score}%")
 
-    st.subheader("🧠 Detected Skills")
-    st.write(found_skills)
+# -------------------------------
+# FUNCTION → ATS SCORE
+# -------------------------------
+def calculate_ats(resume_text, job_desc):
+    if not job_desc:
+        return 50  # default score
 
-    st.subheader("❌ Missing Skills")
-    st.write(missing)
+    resume_words = set(resume_text.lower().split())
+    job_words = set(job_desc.lower().split())
 
-    st.subheader("💡 AI Suggestions")
-    for f in feedback:
-        st.write("•", f)
+    if len(job_words) == 0:
+        return 0
 
-    # Chart
-    st.subheader("📈 Skill Score Chart")
-    fig, ax = plt.subplots()
-    ax.bar(["Match Score"], [score])
-    st.pyplot(fig)
+    score = len(resume_words.intersection(job_words)) / len(job_words) * 100
+    return round(score, 2)
 
-    # PDF Download
-    if st.button("Download Report"):
-        pdf_file = generate_pdf_report(score, found_skills, feedback)
 
-        with open(pdf_file, "rb") as f:
-            st.download_button("Download PDF", f, file_name=pdf_file)
+# -------------------------------
+# MAIN PROCESS
+# -------------------------------
+if uploaded_file:
+
+    if st.button("Analyze Resume"):
+
+        # Extract resume text
+        resume_text = extract_text(uploaded_file)
+
+        if not resume_text.strip():
+            st.error("Could not extract text from PDF.")
+            st.stop()
+
+        st.success("Resume uploaded successfully!")
+
+        col1, col2 = st.columns(2)
+
+        # -------------------------------
+        # SHOW RESUME TEXT
+        # -------------------------------
+        if show_text:
+            with st.expander("Resume Text"):
+                st.write(resume_text)
+
+        # -------------------------------
+        # SKILLS EXTRACTION
+        # -------------------------------
+        skills = extract_skills(resume_text)
+
+        with col1:
+            st.subheader("🧠 Extracted Skills")
+
+            if skills:
+                for skill in skills:
+                    st.write("✅", skill)
+            else:
+                st.write("No skills detected")
+
+        # -------------------------------
+        # JOB MATCH SCORE
+        # -------------------------------
+        with col2:
+            st.subheader("🎯 Job Match Score")
+
+            if job_desc:
+                match_score = match_resume_job(resume_text, job_desc)
+                st.progress(int(match_score))
+                st.write(f"{match_score}% match")
+            else:
+                st.info("Enter job description to see match score")
+
+        # -------------------------------
+        # ATS SCORE
+        # -------------------------------
+        ats_score = calculate_ats(resume_text, job_desc)
+
+        st.subheader("📊 ATS Score")
+        st.progress(int(ats_score))
+        st.write(f"{ats_score}/100")
+
+        # -------------------------------
+        # SUGGESTED ROLE
+        # -------------------------------
+        st.subheader("💼 Suggested Job Role")
+
+        if "python" in resume_text.lower():
+            st.write("Software Developer / Data Analyst")
+        elif "java" in resume_text.lower():
+            st.write("Java Developer")
+        elif "machine learning" in resume_text.lower():
+            st.write("Machine Learning Engineer")
+        else:
+            st.write("General IT Role")
+

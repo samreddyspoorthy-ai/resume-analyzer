@@ -1,10 +1,12 @@
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-
 def match_resume_job(resume_text, job_desc):
-    documents = [resume_text, job_desc]
 
-    cv = CountVectorizer().fit_transform(documents)
-    similarity = cosine_similarity(cv)[0][1]
+    resume_words = set(resume_text.lower().split())
+    job_words = set(job_desc.lower().split())
 
-    return round(similarity * 100, 2)
+    match = resume_words.intersection(job_words)
+
+    if len(job_words) == 0:
+        return 0
+
+    score = len(match)/len(job_words)*100
+    return round(score,2)
